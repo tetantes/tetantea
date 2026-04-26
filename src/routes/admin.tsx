@@ -125,11 +125,18 @@ function SubmissionsTab() {
   const load = useCallback(async () => {
     setLoading(true);
     let q = supabase.from("task_submissions")
-      .select("*, tasks(title, reward_points), profiles(email)")
+      .select("*, tasks(title, reward_points)")
       .order("created_at", { ascending: false });
     if (filter !== "all") q = q.eq("status", filter);
     const { data } = await q;
-    setItems((data ?? []) as SubmissionRow[]);
+    const rows = (data ?? []) as unknown as SubmissionRow[];
+    const userIds = Array.from(new Set(rows.map((r) => r.user_id)));
+    if (userIds.length) {
+      const { data: profs } = await supabase.from("profiles").select("id, email").in("id", userIds);
+      const map = new Map((profs ?? []).map((p) => [p.id, { email: p.email }]));
+      rows.forEach((r) => { r.profiles = map.get(r.user_id) ?? null; });
+    }
+    setItems(rows);
     setLoading(false);
   }, [filter]);
 
@@ -398,10 +405,17 @@ function WithdrawalsTab() {
   const [filter, setFilter] = useState<"pending" | "approved" | "rejected" | "all">("pending");
 
   const load = useCallback(async () => {
-    let q = supabase.from("withdrawals").select("*, profiles(email)").order("created_at", { ascending: false });
+    let q = supabase.from("withdrawals").select("*").order("created_at", { ascending: false });
     if (filter !== "all") q = q.eq("status", filter);
     const { data } = await q;
-    setItems((data ?? []) as WithdrawalRow[]);
+    const rows = (data ?? []) as unknown as WithdrawalRow[];
+    const userIds = Array.from(new Set(rows.map((r) => r.user_id)));
+    if (userIds.length) {
+      const { data: profs } = await supabase.from("profiles").select("id, email").in("id", userIds);
+      const map = new Map((profs ?? []).map((p) => [p.id, { email: p.email }]));
+      rows.forEach((r) => { r.profiles = map.get(r.user_id) ?? null; });
+    }
+    setItems(rows);
   }, [filter]);
   useEffect(() => { void load(); }, [load]);
 
